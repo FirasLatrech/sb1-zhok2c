@@ -3,7 +3,7 @@ import { DropZone } from "./DropZone";
 import { ImagePreview } from "./ImagePreview";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ErrorDisplay } from "./ErrorDisplay";
-const BASE_URL = "https://e4fb-196-203-25-82.ngrok-free.app/";
+const BASE_URL = "https://95c8-196-203-25-82.ngrok-free.app/";
 const API_URL = `${BASE_URL}api/scan/upload-and-process-image`;
 
 const ImageUpload: React.FC = () => {
@@ -83,11 +83,7 @@ const ImageUpload: React.FC = () => {
 
             const result = await response.json();
 
-            const newUrl = result.image_url.replace(
-                "http://localhost:8000/",
-                BASE_URL
-            );
-            setProcessedImage(newUrl);
+            setProcessedImage(result.data_uri);
         } catch (err) {
             setError(
                 err instanceof Error
