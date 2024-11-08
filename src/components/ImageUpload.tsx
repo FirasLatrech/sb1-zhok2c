@@ -3,7 +3,8 @@ import { DropZone } from "./DropZone";
 import { ImagePreview } from "./ImagePreview";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ErrorDisplay } from "./ErrorDisplay";
-const BASE_URL = "https://95c8-196-203-25-82.ngrok-free.app/";
+
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 const API_URL = `${BASE_URL}api/scan/upload-and-process-image`;
 
 const ImageUpload: React.FC = () => {

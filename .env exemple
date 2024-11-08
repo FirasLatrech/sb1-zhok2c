@@ -1,0 +1,2 @@
+BASE_URL=https://95c8-196-203-25-82.ngrok-free.app/
+API_URL=${BASE_URL}api/scan/upload-and-process-image
