@@ -1,181 +1,128 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { DropZone } from "./DropZone";
-import { ImagePreview } from "./ImagePreview";
-import { LoadingSpinner } from "./LoadingSpinner";
-import { ErrorDisplay } from "./ErrorDisplay";
+import React, { useState } from "react";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const API_URL = `${BASE_URL}api/scan/upload-and-process-image`;
+const API_URL = "https://grade.lissene.dev/api/grade-pdf-Img/upload-exam-pdf";
+const API_KEY = "0747abf5-e899-47c7-a38a-c8a1ccc73822";
 
 const ImageUpload: React.FC = () => {
-    const [isDragging, setIsDragging] = useState(false);
-    const [originalImage, setOriginalImage] = useState<string | null>(null);
-    const [processedImage, setProcessedImage] = useState<string | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string>("");
+  const [examGrade, setExamGrade] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        return () => {
-            if (originalImage) {
-                URL.revokeObjectURL(originalImage);
-            }
-        };
-    }, [originalImage]);
+  const handleUrlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    const handleDragOver = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(true);
-    }, []);
+    // Validate URL
+    if (!pdfUrl.trim()) {
+      setError("Please enter a valid PDF URL");
+      return;
+    }
 
-    const handleDragLeave = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-    }, []);
+    try {
+      setIsProcessing(true);
+      setError(null);
+      setExamGrade(null);
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        handleFile(file);
-    }, []);
+      // Encode the URL and construct the full API URL
+      const fullApiUrl = `${API_URL}?url=${encodeURIComponent(pdfUrl)}`;
 
-    const handleFileInput = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
+      const response = await fetch(fullApiUrl, {
+        method: "POST",
+        headers: {
+          "X-API-Key": `${API_KEY}`,
         },
-        []
-    );
+      });
 
-    const handleFile = async (file: File) => {
-        if (!file || !file.type.startsWith("image/")) {
-            setError("Please select a valid image file.");
-            return;
-        }
+      if (!response.ok) {
+        // Try to parse error response
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
 
-        if (file.size > 10 * 1024 * 1024) {
-            setError("File size exceeds 10MB limit.");
-            return;
-        }
+      const result = await response.json();
 
-        try {
-            setError(null);
-            setIsUploading(true);
-            setProcessedImage(null);
+      // Extract exam grade from the response
+      if (result.results && result.results.length > 0) {
+        setExamGrade(result.results[0].exam_grade);
+      } else {
+        setError("No grade found in the response");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to process PDF. Please try again."
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-            const objectUrl = URL.createObjectURL(file);
-            setOriginalImage(objectUrl);
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-indigo-50 to-indigo-100 p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-lg p-8 transition-all duration-300 ease-in-out transform hover:scale-105">
+          <h1 className="text-4xl font-bold text-indigo-800 mb-8 text-center">
+            Taki Academy - Exam Grade Scanner
+          </h1>
 
-            const formData = new FormData();
-            formData.append("file", file);
+          <div className="max-w-2xl mx-auto">
+            <form onSubmit={handleUrlSubmit} className="space-y-6">
+              <div className="flex items-center border-2 border-indigo-300 rounded-lg overflow-hidden transition-all duration-300 ease-in-out hover:border-indigo-500">
+                <input
+                  type="text"
+                  value={pdfUrl}
+                  onChange={(e) => setPdfUrl(e.target.value)}
+                  placeholder="Enter PDF URL (Azure Blob Storage)"
+                  className="flex-grow p-4 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-all duration-300"
+                />
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="bg-indigo-600 text-white px-8 py-4 hover:bg-indigo-700 transition-colors duration-300 disabled:opacity-50 rounded-lg"
+                >
+                  {isProcessing ? "Processing..." : "Get Grade"}
+                </button>
+              </div>
+            </form>
 
-            const response = await fetch(API_URL, {
-                method: "POST",
-                body: formData,
-            });
+            {isProcessing && (
+              <div className="mt-6 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto"></div>
+                <p className="text-indigo-600 mt-3">Processing PDF...</p>
+              </div>
+            )}
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(
-                    errorData.detail?.[0]?.msg ||
-                        `Server error: ${response.status}`
-                );
-            }
+            {error && (
+              <div
+                className="mt-6 bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg transition-all duration-300 ease-in-out"
+                role="alert"
+              >
+                <span className="block sm:inline">{error}</span>
+              </div>
+            )}
 
-            const result = await response.json();
-
-            setProcessedImage(result.data_uri);
-        } catch (err) {
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to process image. Please try again."
-            );
-            if (originalImage) URL.revokeObjectURL(originalImage);
-            setOriginalImage(null);
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
-    const resetUpload = useCallback(() => {
-        if (originalImage) URL.revokeObjectURL(originalImage);
-        setOriginalImage(null);
-        setProcessedImage(null);
-        setError(null);
-    }, [originalImage]);
-
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-100 via-indigo-50 to-purple-100 p-6">
-            <div className="max-w-6xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-xl p-8">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-                        Document Scanner
-                    </h1>
-
-                    {!originalImage ? (
-                        <DropZone
-                            isDragging={isDragging}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            onFileSelect={handleFileInput}
-                        />
-                    ) : (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <ImagePreview
-                                    title="Original Image"
-                                    imageSrc={originalImage}
-                                    onReset={resetUpload}
-                                    showResetButton={true}
-                                />
-
-                                <div className="relative rounded-xl overflow-hidden shadow-lg aspect-video bg-gray-100">
-                                    {isUploading ? (
-                                        <LoadingSpinner />
-                                    ) : error ? (
-                                        <ErrorDisplay message={error} />
-                                    ) : processedImage ? (
-                                        <div className="relative h-full">
-                                            <div className="absolute top-4 left-4 z-10 bg-white/90 px-3 py-2 rounded-lg shadow-md">
-                                                <h2 className="text-lg font-semibold text-gray-700">
-                                                    Processed Image
-                                                </h2>
-                                            </div>
-                                            <img
-                                                src={processedImage}
-                                                alt="Processed"
-                                                className="w-full h-full object-contain"
-                                                onError={() => {
-                                                    setError(
-                                                        "Failed to load processed image"
-                                                    );
-                                                }}
-                                            />
-                                            <div className="absolute bottom-4 right-4">
-                                                <a
-                                                    href={processedImage}
-                                                    download="processed-image.jpg"
-                                                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-                                                >
-                                                    Download
-                                                </a>
-                                            </div>
-                                        </div>
-                                    ) : null}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+            {examGrade && !isProcessing && (
+              <div className="mt-6 text-center bg-indigo-50 border border-indigo-200 rounded-lg p-8 transition-all duration-300 ease-in-out transform hover:scale-105">
+                <h2 className="text-3xl font-bold text-indigo-800 mb-4">
+                  Exam Grade
+                </h2>
+                <div className="text-6xl font-extrabold text-indigo-600">
+                  {examGrade}
                 </div>
-                <div className="mt-8 text-center text-sm text-gray-500">
-                    <p>Supported formats: JPG, PNG, GIF</p>
-                    <p className="mt-1">Maximum file size: 10MB</p>
-                </div>
-            </div>
+              </div>
+            )}
+          </div>
         </div>
-    );
+        <div className="mt-8 text-center text-sm text-indigo-700">
+          <p>Enter a direct URL to a PDF file from Azure Blob Storage</p>
+          <p className="mt-1">Example: Taki Academy Exam PDFs</p>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default ImageUpload;
